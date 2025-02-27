@@ -17,16 +17,16 @@ config = {
     'n_components':16,
 	'training_step':'classification_step',
 	'batch_size':32,
-	'optimizer':'Adadelta',
-	'optimizer_config':{
-		'lr':1,
-		# 'momentum':0.5,
-		# 'weight_decay':2e-4,
+	'scheduler': 'MultiStepLR',
+	'scheduler_config': {
+		'milestones': [100, 150, 200],  # Decay at later stages
+		'gamma': 0.1
 	},
-	'scheduler':'MultiStepLR',
-	'scheduler_config':{
-		'milestones':[75,90,105, 120, 135, 150],
-		'gamma':1
+	'optimizer': 'SGD',
+	'optimizer_config': {
+		'lr': 0.1,  # Standard for CIFAR-10 with SGD
+		'momentum': 0.9,
+		'weight_decay': 1e-4,  # Commonly used for CIFAR-10
 	},
 	'device':'cuda',
 	'validation_step':'classification_step',
@@ -43,10 +43,9 @@ for k, v in config.items():
 		config[k] = vars(torch.optim)[v]([p for p in model.parameters() if p.requires_grad], **config[k+'_config'])
 		config['scheduler'] = vars(torch.optim.lr_scheduler)[config['scheduler']](config[k], **config['scheduler_config'])		
 
-cifar = fetch_openml(data_id=40926, cache=True, as_frame=False)
+cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
 X = cifar.data.astype(np.float32) / 255.0
 y = cifar.target.astype(np.int64)
-# y[y == 10] = 0
 
 val_size = int(0.15 * len(X))
 extra_size = int(config['extra_train'] * (len(X) - val_size))

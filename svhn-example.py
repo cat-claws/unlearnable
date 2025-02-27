@@ -23,22 +23,22 @@ config = {
 	# 	# 'momentum':0.5,
 	# 	# 'weight_decay':2e-4,
 	# },
+	'scheduler': 'MultiStepLR',
+	'scheduler_config': {
+		'milestones': [30, 60, 90, 120],  # Decay starts earlier
+		'gamma': 0.1
+	},
+	'optimizer': 'SGD',
+	'optimizer_config': {
+		'lr': 5e-2,  # Lower LR for better stability
+		'momentum': 0.9,
+		'weight_decay': 5e-4,  # Reduce weight decay
+	},
 	# 'scheduler':'MultiStepLR',
 	# 'scheduler_config':{
-	# 	'milestones':[75,90,105, 120, 135, 150],
-	# 	'gamma':1
+	# 	'milestones':[1, 2, 3, 900],
+	# 	'gamma':0.1
 	# },
-	'optimizer':'SGD',
-	'optimizer_config':{
-		'lr':1e-1,
-		'momentum':0.9,
-		'weight_decay':3.5e-3,
-	},
-	'scheduler':'MultiStepLR',
-	'scheduler_config':{
-		'milestones':[1, 2, 3, 900],
-		'gamma':0.1
-	},
 	'device':'cuda',
 	'validation_step':'classification_step',
 }
