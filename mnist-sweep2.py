@@ -15,10 +15,10 @@ from utils import generate_combinations, flatten_dict
 
 param_grid = OrderedDict({
     'dataset': ['mnist'],
-    'epsilon': [1e-3, 1e-4, 1e-5],
+    'epsilon': [0.1, 0.2, 0.3, 0.4, 0.5],
     'batch_size': [16, 32, 64],
-    'n_components': [2, 3, 5],
-    'extra_train': [1e-3, 1e-4, 1e-5],
+    'n_components': [8, 16, 64],
+    'extra_train': [1e-4] + [round(x * 0.1, 1) for x in range(1, 10)] + [1-1e-4],
     'training_step': ['classification_step'],
     'validation_step': ['classification_step'],
     'device': ['cuda' if torch.cuda.is_available() else 'cpu'],
@@ -28,14 +28,15 @@ param_grid = OrderedDict({
         'SGD': {'lr': [0.1, 0.01], 'momentum': [0.9]},
     },
     'scheduler': {
-        'StepLR': {'step_size': [1000, 2000], 'gamma': [0.95, 1]},
+        'StepLR': {'step_size': [10, 20], 'gamma': [0.95, 0.1]},
         'ExponentialLR': {'gamma': [0.95, 0.99]},
+        'MultiStepLR': {'milestones': [(10, 20, 30)], 'gamma': [0.1]},
     }
 })
 
 models = [
     lambda: torch.hub.load('cat-claws/nn', 'simplecnn', convs=[(1, 16, 5), (16, 24, 5)], linears=[24*4*4, 100]),
-    lambda: torch.hub.load('cat-claws/nn', 'exampleconvnet', in_channels=1, pretrained='exampleconvnet_cbyC')
+    lambda: torch.hub.load('cat-claws/nn', 'exampleconvnet', in_channels=1)#, pretrained='exampleconvnet_cbyC')
 ]
 
 param_combinations = generate_combinations(copy.deepcopy(param_grid))
