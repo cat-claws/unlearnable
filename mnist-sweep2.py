@@ -17,7 +17,7 @@ param_grid = OrderedDict({
     'dataset': ['mnist'],
     'epsilon': [0.1, 0.2, 0.3, 0.4, 0.5],
     'batch_size': [16, 32, 64],
-    'n_components': [8, 16, 64],
+    'n_components': [2, 8, 32, 128],
     'extra_train': [1e-4] + [round(x * 0.1, 1) for x in range(1, 10)] + [1-1e-4],
     'training_step': ['classification_step'],
     'validation_step': ['classification_step'],
@@ -61,19 +61,6 @@ for index, (config, model_fn) in enumerate(itertools.product(param_combinations,
     writer = SummaryWriter(log_dir=f"runs/{config['dataset']}_{index}", flush_secs=10)
 
     flat_hparams = {**flatten_dict(config), 'model': model._get_name()}
-    print(flat_hparams)
-    # writer.add_hparams(flat_hparams, metric_dict={'Epoch-correct/valid':0}, run_name = f"runs/{config['dataset']}_{index}")
-#    writer = SummaryWriter(f"runs/{run_name}")
-
-    from torch.utils.tensorboard.summary import hparams
-    exp, ssi, sei = hparams(hparam_dict = flat_hparams, metric_dict={'Epoch-correct/valid': 0})   
-    writer.file_writer.add_summary(exp)                 
-    writer.file_writer.add_summary(ssi)                 
-    writer.file_writer.add_summary(sei)  
-
-    # add my arbitrary stuff
-    # writer.add_scalar('Epoch-correct/valid', 100, global_step)
-
 
     config = copy.deepcopy(config)
     for k, v in config.items():
@@ -90,8 +77,23 @@ for index, (config, model_fn) in enumerate(itertools.product(param_combinations,
     X_extra, y_extra = X[extra_indices], y[extra_indices]
     X_val, y_val = X[val_indices], y[val_indices]
 
-    shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components=config['n_components'], epsilon=config['epsilon'])
+    try:
+        shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components=config['n_components'], epsilon=config['epsilon'])
+    except Exception as e:
+        flat_hparams['error'] = str(e)
+
+    print(flat_hparams)
+    from torch.utils.tensorboard.summary import hparams
+    exp, ssi, sei = hparams(hparam_dict = flat_hparams, metric_dict={'Epoch-correct/valid': 0})   
+    writer.file_writer.add_summary(exp)                 
+    writer.file_writer.add_summary(ssi)                 
+    writer.file_writer.add_summary(sei)
     
+    if 'error' in flat_hparams:
+        writer.flush()
+        writer.close()
+        continue 
+
     X_private = np.clip(X_extra + shift, 0, 1)
     X_train = np.vstack((X_train, X_private)).reshape(-1, 1, 28, 28)
     y_train = np.hstack((y_train, y_extra))
@@ -103,7 +105,7 @@ for index, (config, model_fn) in enumerate(itertools.product(param_combinations,
     train_loader = torch.utils.data.DataLoader(train_set, num_workers=4, batch_size=config['batch_size'], shuffle=True)
     val_loader = torch.utils.data.DataLoader(val_set, num_workers=4, batch_size=config['batch_size'])
 
-    for epoch in range(5):
+    for epoch in range(50):
         train(model, train_loader=train_loader, epoch=epoch, writer=writer, **config)
         validate(model, val_loader=val_loader, epoch=epoch, writer=writer, **config)
 
