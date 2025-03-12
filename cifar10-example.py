@@ -32,7 +32,9 @@ config = {
 	'validation_step':'classification_step',
 }
 
-model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
+model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False).to(config['device'])
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{model._get_name()}_{config['training_step']}_{config['epsilon']}_{config['extra_train']}", flush_secs=10)
 
@@ -47,7 +49,7 @@ cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
 X = cifar.data.astype(np.float32) / 255.0
 y = cifar.target.astype(np.int64)
 
-val_size = int(0.15 * len(X))
+val_size = int(0.2 * len(X))
 extra_size = int(config['extra_train'] * (len(X) - val_size))
 
 train_indices, extra_indices, val_indices = torch.utils.data.random_split(range(len(X)), [len(X) - val_size - extra_size, extra_size, val_size])
@@ -72,7 +74,7 @@ val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32
 train_loader = torch.utils.data.DataLoader(train_set, num_workers = 4, batch_size = config['batch_size'], shuffle=True)
 val_loader = torch.utils.data.DataLoader(val_set, num_workers = 4, batch_size = config['batch_size'])
 
-for epoch in range(100):
+for epoch in range(300):
 	if epoch > 0:
 		train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
 

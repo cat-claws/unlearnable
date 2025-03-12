@@ -44,6 +44,7 @@ config = {
 }
 
 model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+model = torch.hub.load('pytorch/vision', 'resnet18', pretrained=False).to(config['device'])
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{model._get_name()}_{config['training_step']}_{config['epsilon']}_{config['extra_train']}", flush_secs=10)
 
