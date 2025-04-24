@@ -25,12 +25,14 @@ param_grid = OrderedDict({
     'optimizer': {
         # 'Adadelta': {'lr': [1.0, 0.1]},
         # 'Adam': {'lr': [1e-3, 1e-4], 'betas': [(0.9, 0.999)]},
-        'SGD': {'lr': [0.1], 'momentum': [0.9]},
+        # 'SGD': {'lr': [0.1], 'momentum': [0.9]},
+        'AdamW':{'lr':[0.001], 'weight_decay': 5e-4}
     },
     'scheduler': {
         # 'StepLR': {'step_size': [50, 100], 'gamma': [0.95, 0.1]},
         # 'ExponentialLR': {'gamma': [0.95, 0.99]},
-        'MultiStepLR': {'milestones': [(100, 150, 200)], 'gamma': [0.1]},
+        # 'MultiStepLR': {'milestones': [(100, 150, 200)], 'gamma': [0.1]},
+        'CosineAnnealingLR':{'T_max': 200},
     }
 })
 
@@ -42,11 +44,11 @@ models = [
 
 param_combinations = generate_combinations(copy.deepcopy(param_grid))
 
-mnist = fetch_openml('CIFAR_10', cache=True, as_frame=False)
-X = mnist.data.astype(np.float32) / 255.0
-y = mnist.target.astype(np.int64)
+cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
+X = cifar.data.astype(np.float32)
+y = cifar.target.astype(np.int64)
 
-val_size = int(0.2 * len(X))
+val_size = int(1/6 * len(X))
 
 os.makedirs("checkpoints", exist_ok=True)
 completed_indices = {int(f.split("_")[1]) for f in os.listdir("checkpoints") if f.startswith(param_grid['dataset'][0]) and f.endswith(".pt")}
@@ -100,11 +102,37 @@ for index, (config, model_fn) in enumerate(itertools.product(param_combinations,
     y_train = np.hstack((y_train, y_extra))
     X_val = X_val.reshape(-1, 3, 32, 32)
 
-    train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
-    val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
+    import torchvision.transforms as transforms
+    from data import TransformTensorDataset
 
-    train_loader = torch.utils.data.DataLoader(train_set, num_workers=4, batch_size=config['batch_size'], shuffle=True)
-    val_loader = torch.utils.data.DataLoader(val_set, num_workers=4, batch_size=config['batch_size'])
+
+    train_transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.RandomCrop(32, padding=4),
+        transforms.RandomHorizontalFlip(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+        transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.ToPILImage(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    ])
+
+    # train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
+    # val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
+
+    # train_loader = torch.utils.data.DataLoader(train_set, num_workers=4, batch_size=config['batch_size'], shuffle=True)
+    # val_loader = torch.utils.data.DataLoader(val_set, num_workers=4, batch_size=config['batch_size'])
+    train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
+    val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
+
+
+    train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
+    val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
+
 
     for epoch in range(300):
         train(model, train_loader=train_loader, epoch=epoch, writer=writer, **config)

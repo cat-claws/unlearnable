@@ -12,30 +12,20 @@ from shift import shift_towards_nearest_other_class
 
 config = {
 	'dataset':'cifar10',
-	'extra_train':0.5,
+	'extra_train':0.51,
     'epsilon':8/255,
-    'n_components':16,
+    'n_components':2,
 	'training_step':'classification_step',
-	'batch_size':128,
-	'scheduler': 'CosineAnnealingWarmRestarts',
+	'batch_size':512,
+	'scheduler': 'CosineAnnealingLR',
 	'scheduler_config': {
-		'T_0': 10,  # Decay at later stages
-		'T_mult': 2,
-		'eta_min': 0,
+		'T_max': 200,  # Decay at later stages
 	},
-	# 'optimizer': 'SGD',
-	# 'optimizer_config': {
-	# 	'lr': 0.1,  # Standard for CIFAR-10 with SGD
-	# 	'momentum': 0.9,
-	# 	'weight_decay': 5e-4,  # Commonly used for CIFAR-10
-	# 	'nesterov': True,
-	# },
-	'optimizer': 'SGD',
+	'optimizer': 'AdamW',
 	'optimizer_config': {
-		'lr': 0.1,  # Standard for CIFAR-10 with SGD
-		'momentum': 0.9,
+		'lr': 0.001,  # Standard for CIFAR-10 with SGD
+		# 'momentum': 0.9,
 		'weight_decay': 5e-4,  # Commonly used for CIFAR-10
-		'nesterov': True,
 	},
 	'device':'cuda',
 	'validation_step':'classification_step',
@@ -43,8 +33,16 @@ config = {
 
 # model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
 # model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
-model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False).to(config['device'])
-# model = torch.hub.load('pytorch/vision:v0.10.0', 'wide_resnet50_2', pretrained=False, num_classes=10).to(config['device'])
+# model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False).to(config['device'])
+from torchvision.models import resnet18
+model = resnet18()
+import torch.nn as nn
+import torch.nn.functional as F
+
+model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+model.maxpool = nn.Identity()
+model.fc = nn.Linear(512, 10)
+model = model.to(config['device'])
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{model._get_name()}_{config['training_step']}_{config['epsilon']}_{config['extra_train']}", flush_secs=10)
 
@@ -56,10 +54,11 @@ for k, v in config.items():
 		config['scheduler'] = vars(torch.optim.lr_scheduler)[config['scheduler']](config[k], **config['scheduler_config'])		
 
 cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
-X = cifar.data.astype(np.float32) / 255.0
+X = cifar.data.astype(np.uint8)
 y = cifar.target.astype(np.int64)
 
-val_size = int(0.2 * len(X))
+val_size = int(1/6 * len(X))
+print(val_size)
 extra_size = int(config['extra_train'] * (len(X) - val_size))
 
 train_indices, extra_indices, val_indices = torch.utils.data.random_split(range(len(X)), [len(X) - val_size - extra_size, extra_size, val_size])
@@ -69,27 +68,44 @@ X_extra, y_extra = X[extra_indices], y[extra_indices]
 X_val, y_val = X[val_indices], y[val_indices]
 
 shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components = config['n_components'], epsilon = config['epsilon'])
-
-
 X_private = X_extra#np.clip(X_extra + shift, 0, 1)
-
-print('XXXXXXXXXXXXXX', X, 'TTTTTTTTTTTTTTTTT', X_train, "SSSSSSSSSSSSSSS", shift, 'EEEEEEEEEEEEEEE', X_extra, 'ppPPPPPPPPPPPPPPP', X_private)
-
+print(X_val, X_extra, X_train, X_private, '=============================')
 
 X_train = np.vstack((X_train, X_private)).reshape(-1, 3, 32, 32)
 y_train = np.hstack((y_train, y_extra))
 
 X_val = X_val.reshape(-1, 3, 32, 32)
 
-train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
-val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
+import torchvision.transforms as transforms
+from data import TransformTensorDataset
 
-train_loader = torch.utils.data.DataLoader(train_set, num_workers = 4, batch_size = config['batch_size'], shuffle=True)
-val_loader = torch.utils.data.DataLoader(val_set, num_workers = 4, batch_size = config['batch_size'])
 
-for epoch in range(300):
-	if epoch > 0:
-		train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
+train_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.RandomCrop(32, padding=4),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+])
+
+test_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+])
+
+train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.uint8), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
+val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.uint8), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
+
+
+train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
+val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
+
+
+for epoch in range(200):
+	# if epoch > 0:
+	train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
 
 	validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
 
