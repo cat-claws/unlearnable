@@ -111,13 +111,13 @@ model = WideResNet(depth=28, widen_factor=10, num_classes=10, drop_rate=0.3).to(
 # Loss, optimizer, scheduler
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=5e-4)
-# scheduler = CosineAnnealingLR(optimizer, T_max=200)
+scheduler = CosineAnnealingLR(optimizer, T_max=200)
 
-from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingWarmRestarts
+# from torch.optim.lr_scheduler import SequentialLR, LinearLR, CosineAnnealingWarmRestarts
 
-warmup = LinearLR(optimizer, start_factor=0.1, total_iters=5)
-cosine = CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=1)
-scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[5])
+# warmup = LinearLR(optimizer, start_factor=0.1, total_iters=5)
+# cosine = CosineAnnealingWarmRestarts(optimizer, T_0=50, T_mult=1)
+# scheduler = SequentialLR(optimizer, schedulers=[warmup, cosine], milestones=[5])
 
 # Training function
 def train(epoch):
@@ -162,6 +162,6 @@ for epoch in range(305):
 
     if acc > best_acc:
         best_acc = acc
-        torch.save(model.state_dict(), 'best_wrn28-10.pth')
+        # torch.save(model.state_dict(), 'best_wrn28-10.pth')
 
 print(f'🎯 Best Test Accuracy: {best_acc:.2f}%')
