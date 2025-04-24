@@ -106,7 +106,7 @@ testset = torchvision.datasets.CIFAR10(root='./data', train=False, download=True
 testloader = DataLoader(testset, batch_size=100, shuffle=False, num_workers=2)
 
 # Model
-model = WideResNet(depth=28, widen_factor=10, num_classes=10, drop_rate=0.3).to(device)
+model = WideResNet(depth=40, widen_factor=10, num_classes=10, drop_rate=0.3).to(device)
 
 # Loss, optimizer, scheduler
 criterion = nn.CrossEntropyLoss()
