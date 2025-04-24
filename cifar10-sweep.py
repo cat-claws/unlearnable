@@ -1,5 +1,7 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard.summary import hparams
+
 from torchiteration import train, validate, predict, classification_step, predict_classification_step
 
 import numpy as np
@@ -86,7 +88,6 @@ for index, (config, model_fn) in enumerate(itertools.product(param_combinations,
         flat_hparams['error'] = str(e)
 
     print(flat_hparams)
-    from torch.utils.tensorboard.summary import hparams
     exp, ssi, sei = hparams(hparam_dict = flat_hparams, metric_dict={'Epoch-correct/valid': 0})   
     writer.file_writer.add_summary(exp)                 
     writer.file_writer.add_summary(ssi)                 
