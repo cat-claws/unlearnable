@@ -1,10 +1,6 @@
-import csv
 import itertools
 
-# ---------------------------
-# BASE CONFIG
-# ---------------------------
-
+# Base config
 base_config = {
     "python": "python",
     "script": "train.py",
@@ -21,10 +17,7 @@ base_config = {
     "--batch_size": "128",
 }
 
-# ---------------------------
-# VARIANTS
-# ---------------------------
-
+# Variant groups
 model_variants = [
     {"--model-depth": "34"},
     {"--model-drop_rate": "0.0"},
@@ -39,10 +32,6 @@ scheduler_variants = [
 ]
 
 variant_groups = [model_variants, optimizer_variants, scheduler_variants]
-
-# ---------------------------
-# Ablation & Pairwise Combo
-# ---------------------------
 
 def generate_ablation_configs(base, variant_groups):
     configs = []
@@ -64,33 +53,24 @@ def generate_pairwise_combos(base, variant_groups):
                 combos.append(cfg)
     return combos
 
-# ---------------------------
-# Save as .sh (TSV format)
-# ---------------------------
+def save_as_runnable_sh(configs, filename):
+    with open(filename, "w") as f:
+        for cfg in configs:
+            parts = [cfg["python"], cfg["script"]]
+            for k, v in cfg.items():
+                if k not in {"python", "script"}:
+                    parts.append(k)
+                    parts.append(str(v))
+            line = "\t".join(parts)
+            f.write(line + "\n")
+    print(f"✅ Saved as: {filename} (runnable .sh, tab-separated)")
+    print(f"💡 You can now run: bash {filename}")
 
-def save_as_tsv_sh(configs, filename="ablations.sh"):
-    all_keys = sorted({k for cfg in configs for k in cfg})
-    rows = [[cfg.get(k, "") for k in all_keys] for cfg in configs]
-
-    with open(filename, "w", newline="") as f:
-        writer = csv.writer(f, delimiter="\t")
-        writer.writerow(all_keys)
-        writer.writerows(rows)
-
-    print(f"✅ Saved as TSV-formatted shell file: {filename}")
-    print(f"💡 To run: bash {filename}")
-
-# ---------------------------
-# MAIN
-# ---------------------------
-
+# Main
 if __name__ == "__main__":
-    print("🔬 Generating ablation configs...")
+    print("🔬 Generating clean runnable ablation shell script...")
+    all_configs = generate_ablation_configs(base_config, variant_groups)
+    # all_configs += generate_pairwise_combos(base_config, variant_groups)
 
-    round1 = generate_ablation_configs(base_config, variant_groups)
-    round2 = generate_pairwise_combos(base_config, variant_groups)
-
-    all_configs = round1 + round2
-    save_as_tsv_sh(all_configs, "ablations.sh")
-
-    print(f"🧪 Total configs generated: {len(all_configs)}")
+    save_as_runnable_sh(all_configs, "ablations.tsv")
+    print(f"🧪 Total runnable commands: {len(all_configs)}")
