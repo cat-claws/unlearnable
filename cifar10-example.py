@@ -1,72 +1,51 @@
-import csv
-import itertools
+import torch
+from torch.utils.tensorboard import SummaryWriter
 
-# ---------------------------
-# BASE CONFIG
-# ---------------------------
+from torchiteration import train, validate, predict, classification_step, predict_classification_step, build_optimizer, build_scheduler, save_hparams
 
-base_config = {
-    "python": "python",
-    "script": "train.py",
-    "--model": "WideResNet",
-    "--model-depth": "28",
-    "--model-widen_factor": "10",
-    "--model-drop_rate": "0.3",
-    "--optimizer": "SGD",
-    "--optimizer-lr": "0.1",
-    "--optimizer-momentum": "0.9",
-    "--optimizer-weight_decay": "0.0005",
-    "--scheduler": "CosineAnnealingLR",
-    "--scheduler-T_max": "200",
-    "--batch_size": "128",
-}
+import numpy as np
+from sklearn.datasets import fetch_openml
+from sklearn.decomposition import PCA
 
-# ---------------------------
-# VARIANTS
-# ---------------------------
+from shift import shift_towards_nearest_other_class
 
-model_variants = [
-    {"--model-depth": "34"},
-    {"--model-drop_rate": "0.0"},
-]
+import argparse
+parser = argparse.ArgumentParser()
 
-optimizer_variants = [
-    {"--optimizer": "AdamW", "--optimizer-lr": "0.001", "--optimizer-weight_decay": "0.01"},
-]
+parser.add_argument('--model', type=str)
+parser.add_argument('--optimizer', type=str)
+parser.add_argument('--scheduler', type=str)
 
 parser.add_argument('--model-depth', type=int)
 parser.add_argument('--model-widen_factor', type=int)
 parser.add_argument('--model-drop_rate', type=float)
 
-variant_groups = [model_variants, optimizer_variants, scheduler_variants]
+parser.add_argument('--optimizer-lr', type=float)
+parser.add_argument('--optimizer-momentum', type=float)
+parser.add_argument('--optimizer-weight_decay', type=float)
+parser.add_argument('--optimizer-nesterov', action='store_true')
+parser.add_argument('--optimizer-betas', type=lambda s: tuple(map(float, s.split(','))))
+parser.add_argument('--optimizer-eps', type=float)
 
-# ---------------------------
-# Ablation & Pairwise Combo
-# ---------------------------
+parser.add_argument('--scheduler-T_max', type=int)
+parser.add_argument('--scheduler-eta_min', type=float)
+parser.add_argument('--scheduler-step_size', type=int)
+parser.add_argument('--scheduler-gamma', type=float)
 
-def generate_ablation_configs(base, variant_groups):
-    configs = []
-    for group in variant_groups:
-        for variant in group:
-            cfg = base.copy()
-            cfg.update(variant)
-            configs.append(cfg)
-    return configs
+parser.add_argument('--dataset', type=str, default='cifar10')
+parser.add_argument('--extra_train', type=float, default=0.51)
+parser.add_argument('--n_components', type=int, default=2)
+parser.add_argument('--training_step', type=str, default='classification_step')
+parser.add_argument('--validation_step', type=str, default='classification_step')
+parser.add_argument('--batch_size', type=int, default=512)
+parser.add_argument('--device', type=str, default='cuda')
+parser.add_argument('--epsilon', type=float)
 
-def generate_pairwise_combos(base, variant_groups):
-    combos = []
-    for g1, g2 in itertools.combinations(variant_groups, 2):
-        for v1 in g1:
-            for v2 in g2:
-                cfg = base.copy()
-                cfg.update(v1)
-                cfg.update(v2)
-                combos.append(cfg)
-    return combos
+config = {k: v for k, v in vars(parser.parse_args()).items() if v is not None}
+print(config)
 
-# ---------------------------
-# Save as .sh (TSV format)
-# ---------------------------
+writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
+save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
 # model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
 # model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
@@ -81,6 +60,23 @@ model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_c
 # model.maxpool = nn.Identity()
 # model.fc = nn.Linear(512, 10)
 # model = model.to(config['device'])
+
+config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
+config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
+config['scheduler'] = build_scheduler(config, config['optimizer'])
+
+cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
+X = cifar.data.astype(np.uint8)
+y = cifar.target.astype(np.int64)
+
+val_size = int(1/6 * len(X))
+extra_size = int(config['extra_train'] * (len(X) - val_size))
+
+train_indices, extra_indices, val_indices = torch.utils.data.random_split(range(len(X)), [len(X) - val_size - extra_size, extra_size, val_size])
+
+X_train, y_train = X[train_indices], y[train_indices]
+X_extra, y_extra = X[extra_indices], y[extra_indices]
+X_val, y_val = X[val_indices], y[val_indices]
 
 shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components = config['n_components'], epsilon = config['epsilon'])
 X_private = X_extra#np.clip(X_extra + shift, 0, 1)
