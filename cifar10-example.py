@@ -16,10 +16,9 @@ parser.add_argument('--model', type=str)
 parser.add_argument('--optimizer', type=str)
 parser.add_argument('--scheduler', type=str)
 
-# Prefixed model args
-# parser.add_argument('--model-pretrained', action='store_true')
-# parser.add_argument('--model-num_classes', type=int)
-# parser.add_argument('--model-in_channels', type=int)
+parser.add_argument('--model-depth', type=int)
+parser.add_argument('--model-widen_factor', type=int)
+parser.add_argument('--model-drop_rate', type=float)
 
 parser.add_argument('--optimizer-lr', type=float)
 parser.add_argument('--optimizer-momentum', type=float)
@@ -50,16 +49,17 @@ save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
 # model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
 # model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
-model = torch.hub.load('pytorch/vision:v0.10.0', config['model'], pretrained=False).to(config['device'])
+# model = torch.hub.load('pytorch/vision:v0.10.0', , pretrained=False).to(config['device'])
+model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_classes=10, depth=28, drop_rate=0.3, widen_factor = 10).to(config['device'])
 # from torchvision.models import resnet18
 # model = resnet18()
-import torch.nn as nn
-import torch.nn.functional as F
+# import torch.nn as nn
+# import torch.nn.functional as F
 
-model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-model.maxpool = nn.Identity()
-model.fc = nn.Linear(512, 10)
-model = model.to(config['device'])
+# model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+# model.maxpool = nn.Identity()
+# model.fc = nn.Linear(512, 10)
+# model = model.to(config['device'])
 
 config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
 config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
@@ -90,24 +90,25 @@ import torchvision.transforms as transforms
 from data import TransformTensorDataset
 
 
-train_transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.RandomCrop(32, padding=4),
-    transforms.RandomHorizontalFlip(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
-])
+# train_transform = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.RandomCrop(32, padding=4),
+#     transforms.RandomHorizontalFlip(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+#     transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+# ])
 
-test_transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-])
+# test_transform = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+# ])
 
-train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.uint8), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
-val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.uint8), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
-
+# train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.uint8), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
+# val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.uint8), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
+train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
+val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
 
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
 val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
