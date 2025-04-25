@@ -34,9 +34,9 @@ optimizer_variants = [
     {"--optimizer": "AdamW", "--optimizer-lr": "0.001", "--optimizer-weight_decay": "0.01"},
 ]
 
-scheduler_variants = [
-    {"--scheduler": "StepLR", "--scheduler-step_size": "100", "--scheduler-gamma": "0.1"},
-]
+parser.add_argument('--model-depth', type=int)
+parser.add_argument('--model-widen_factor', type=int)
+parser.add_argument('--model-drop_rate', type=float)
 
 variant_groups = [model_variants, optimizer_variants, scheduler_variants]
 
@@ -68,29 +68,69 @@ def generate_pairwise_combos(base, variant_groups):
 # Save as .sh (TSV format)
 # ---------------------------
 
-def save_as_tsv_sh(configs, filename="ablations.sh"):
-    all_keys = sorted({k for cfg in configs for k in cfg})
-    rows = [[cfg.get(k, "") for k in all_keys] for cfg in configs]
+# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+# model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
+# model = torch.hub.load('pytorch/vision:v0.10.0', , pretrained=False).to(config['device'])
+model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_classes=10, depth=28, drop_rate=0.3, widen_factor = 10).to(config['device'])
+# from torchvision.models import resnet18
+# model = resnet18()
+# import torch.nn as nn
+# import torch.nn.functional as F
 
-    with open(filename, "w", newline="") as f:
-        writer = csv.writer(f, delimiter="\t")
-        writer.writerow(all_keys)
-        writer.writerows(rows)
+# model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+# model.maxpool = nn.Identity()
+# model.fc = nn.Linear(512, 10)
+# model = model.to(config['device'])
 
-    print(f"✅ Saved as TSV-formatted shell file: {filename}")
-    print(f"💡 To run: bash {filename}")
+shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components = config['n_components'], epsilon = config['epsilon'])
+X_private = X_extra#np.clip(X_extra + shift, 0, 1)
 
-# ---------------------------
-# MAIN
-# ---------------------------
+X_train = np.vstack((X_train, X_private)).reshape(-1, 3, 32, 32)
+y_train = np.hstack((y_train, y_extra))
 
-if __name__ == "__main__":
-    print("🔬 Generating ablation configs...")
+X_val = X_val.reshape(-1, 3, 32, 32)
 
-    round1 = generate_ablation_configs(base_config, variant_groups)
-    round2 = generate_pairwise_combos(base_config, variant_groups)
+import torchvision.transforms as transforms
+from data import TransformTensorDataset
 
-    all_configs = round1 + round2
-    save_as_tsv_sh(all_configs, "ablations.sh")
 
-    print(f"🧪 Total configs generated: {len(all_configs)}")
+# train_transform = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.RandomCrop(32, padding=4),
+#     transforms.RandomHorizontalFlip(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+#     transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+# ])
+
+# test_transform = transforms.Compose([
+#     transforms.ToPILImage(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+# ])
+
+# train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.uint8), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
+# val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.uint8), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
+train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
+val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
+
+train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
+val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
+
+
+for epoch in range(200):
+	if epoch > 0:
+		train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
+
+	validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
+
+	# torch.save(model.state_dict(), 'checkpoints/' + writer.log_dir.split('/')[-1] + f"_{epoch:03}.pt")
+
+print(model)
+
+outputs = predict(model, predict_classification_step, val_loader = val_loader, **config)
+
+# print(outputs.keys(), outputs['predictions'])
+
+writer.flush()
+writer.close()
