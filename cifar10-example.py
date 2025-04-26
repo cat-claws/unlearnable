@@ -33,11 +33,11 @@ parser.add_argument('--scheduler-step_size', type=int)
 parser.add_argument('--scheduler-gamma', type=float)
 
 parser.add_argument('--dataset', type=str, default='cifar10')
-parser.add_argument('--extra_train', type=float, default=0.51)
-parser.add_argument('--n_components', type=int, default=2)
+parser.add_argument('--extra_train', type=float)
+parser.add_argument('--n_components', type=int)
 parser.add_argument('--training_step', type=str, default='classification_step')
 parser.add_argument('--validation_step', type=str, default='classification_step')
-parser.add_argument('--batch_size', type=int, default=512)
+parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--device', type=str, default='cuda')
 parser.add_argument('--epsilon', type=float)
 
@@ -51,15 +51,6 @@ save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 # model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
 # model = torch.hub.load('pytorch/vision:v0.10.0', , pretrained=False).to(config['device'])
 model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_classes=10, depth=28, drop_rate=0.3, widen_factor = 10).to(config['device'])
-# from torchvision.models import resnet18
-# model = resnet18()
-# import torch.nn as nn
-# import torch.nn.functional as F
-
-# model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-# model.maxpool = nn.Identity()
-# model.fc = nn.Linear(512, 10)
-# model = model.to(config['device'])
 
 config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
 config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
@@ -79,7 +70,9 @@ X_extra, y_extra = X[extra_indices], y[extra_indices]
 X_val, y_val = X[val_indices], y[val_indices]
 
 shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components = config['n_components'], epsilon = config['epsilon'])
-X_private = X_extra#np.clip(X_extra + shift, 0, 1)
+X_private = X_extra
+# X_private = np.clip(X_extra + shift, 0, 1)
+print(X_train, X_extra, X_private, shift)
 
 X_train = np.vstack((X_train, X_private)).reshape(-1, 3, 32, 32)
 y_train = np.hstack((y_train, y_extra))
