@@ -57,35 +57,53 @@ config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
 config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
 config['scheduler'] = build_scheduler(config, config['optimizer'])
 
-import torchvision
+cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
+X = cifar.data.astype(np.uint8) / 255
+y = cifar.target.astype(np.int64)
 
-train_transform = torchvision.transforms.Compose([
-    torchvision.transforms.RandomCrop(32, padding=4),
-    torchvision.transforms.RandomHorizontalFlip(),
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+val_size = int(1/6 * len(X))
+extra_size = int(config['extra_train'] * (len(X) - val_size))
+
+train_indices, extra_indices, val_indices = torch.utils.data.random_split(range(len(X)), [len(X) - val_size - extra_size, extra_size, val_size])
+
+X_train, y_train = X[train_indices], y[train_indices]
+X_extra, y_extra = X[extra_indices], y[extra_indices]
+X_val, y_val = X[val_indices], y[val_indices]
+
+shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components = config['n_components'], epsilon = config['epsilon'])
+# X_private = X_extra
+X_private = np.clip(X_extra + shift, 0, 1)
+print(X_train, X_extra, X_private, shift)
+
+X_train = np.vstack((X_train, X_private)).reshape(-1, 3, 32, 32)
+y_train = np.hstack((y_train, y_extra))
+
+X_val = X_val.reshape(-1, 3, 32, 32)
+
+import torchvision.transforms as transforms
+from data import TransformTensorDataset
+
+
+train_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.RandomCrop(32, padding=4),
+    transforms.RandomHorizontalFlip(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
 ])
 
-test_transform = torchvision.transforms.Compose([
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+test_transform = transforms.Compose([
+    transforms.ToPILImage(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
-train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=train_transform)
-val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)
+train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
+val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
 
-extra_size = int(config['extra_train'] * len(train_set))
-train_indices, extra_indices = torch.utils.data.random_split(range(len(train_set)), [len(train_set) - extra_size, extra_size])
-
-X_extra = train_set.data[extra_indices.indices]
-
-shift = shift_towards_nearest_other_class(X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], n_components = config['n_components'], epsilon = config['epsilon'])
-X_private = np.clip(X_extra + shift.reshape(-1, 32, 32, 3), 0, 255)
-print(train_set.data, X_extra, X_private, shift)
-
-train_set.data[extra_indices.indices] = X_private
-
+# train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
+# val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
 
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
 val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
