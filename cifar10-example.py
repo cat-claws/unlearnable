@@ -47,17 +47,18 @@ print(config)
 writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
-# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
 # model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
 # model = torch.hub.load('pytorch/vision:v0.10.0', , pretrained=False).to(config['device'])
-model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_classes=10, depth=28, drop_rate=0.3, widen_factor = 10).to(config['device'])
+# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_classes=10, depth=config['model_depth'], drop_rate=config['model_drop_rate'], widen_factor = config['model_widen_factor']).to(config['device'])
 
 config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
 config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
 config['scheduler'] = build_scheduler(config, config['optimizer'])
 
 cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
-X = cifar.data.astype(np.uint8)
+X = cifar.data.astype(np.uint8) / 255
 y = cifar.target.astype(np.int64)
 
 val_size = int(1/6 * len(X))
@@ -70,8 +71,8 @@ X_extra, y_extra = X[extra_indices], y[extra_indices]
 X_val, y_val = X[val_indices], y[val_indices]
 
 shift = shift_towards_nearest_other_class(X_extra, y_extra, X_extra, y_extra, n_components = config['n_components'], epsilon = config['epsilon'])
-X_private = X_extra
-# X_private = np.clip(X_extra + shift, 0, 1)
+# X_private = X_extra
+X_private = np.clip(X_extra + shift, 0, 1)
 print(X_train, X_extra, X_private, shift)
 
 X_train = np.vstack((X_train, X_private)).reshape(-1, 3, 32, 32)
@@ -83,32 +84,48 @@ import torchvision.transforms as transforms
 from data import TransformTensorDataset
 
 
-# train_transform = transforms.Compose([
-#     transforms.ToPILImage(),
-#     transforms.RandomCrop(32, padding=4),
-#     transforms.RandomHorizontalFlip(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-#     transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
-# ])
+train_transform = transforms.Compose([
+    # transforms.ToPILImage(),
+    # transforms.RandomCrop(32, padding=4),
+    # transforms.RandomHorizontalFlip(),
+    # transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+])
 
-# test_transform = transforms.Compose([
-#     transforms.ToPILImage(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-# ])
+test_transform = transforms.Compose([
+    # transforms.ToPILImage(),
+    # transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+])
+
+train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
+val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
+
 
 # train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.uint8), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
 # val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.uint8), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
-train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
-val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
+# train_set = torch.utils.data.TensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64))
+# val_set = torch.utils.data.TensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64))
 
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
 val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
 
+import subprocess
+
+def get_gpu_usage():
+    result = subprocess.run(
+        ['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
+        stdout=subprocess.PIPE, text=True
+    )
+    usage = result.stdout.strip().split('\n')
+    for idx, line in enumerate(usage):
+        gpu_util, mem_used, mem_total = map(int, line.split(', '))
+        print(f"GPU {idx}: {gpu_util}% used, {mem_used}MB / {mem_total}MB memory")
 
 for epoch in range(200):
 	if epoch > 0:
+		get_gpu_usage()
 		train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
 
 	validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)

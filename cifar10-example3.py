@@ -31,18 +31,18 @@ config = {
 	'validation_step':'classification_step',
 }
 
-# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+model = torch.hub.load('cat-claws/nn', 'resnet18_cifar', pretrained=False).to(config['device'])
 # model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
 # model = torch.hub.load('pytorch/vision:v0.10.0', 'resnet18', pretrained=False).to(config['device'])
-from torchvision.models import resnet18
-model = resnet18()
-import torch.nn as nn
-import torch.nn.functional as F
+# from torchvision.models import resnet18
+# model = resnet18()
+# import torch.nn as nn
+# import torch.nn.functional as F
 
-model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-model.maxpool = nn.Identity()
-model.fc = nn.Linear(512, 10)
-model = model.to(config['device'])
+# model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
+# model.maxpool = nn.Identity()
+# model.fc = nn.Linear(512, 10)
+# model = model.to(config['device'])
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{model._get_name()}_{config['training_step']}_{config['epsilon']}_{config['extra_train']}", flush_secs=10)
 
