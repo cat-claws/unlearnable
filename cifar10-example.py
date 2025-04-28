@@ -38,6 +38,7 @@ parser.add_argument('--n_components', type=int)
 parser.add_argument('--training_step', type=str, default='classification_step')
 parser.add_argument('--validation_step', type=str, default='classification_step')
 parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--epochs', type=int)
 parser.add_argument('--device', type=str, default='cuda')
 parser.add_argument('--epsilon', type=float)
 
@@ -102,14 +103,14 @@ def get_gpu_usage():
         gpu_util, mem_used, mem_total = map(int, line.split(', '))
         print(f"GPU {idx}: {gpu_util}% used, {mem_used}MB / {mem_total}MB memory")
 
-for epoch in range(200):
-	# if epoch > 0:
-	get_gpu_usage()
-	train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
+for epoch in range(config['epochs']):
+    get_gpu_usage()
+    if epoch > 0:
+        train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
 
-	validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
+    validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
 
-	# torch.save(model.state_dict(), 'checkpoints/' + writer.log_dir.split('/')[-1] + f"_{epoch:03}.pt")
+    # torch.save(model.state_dict(), 'checkpoints/' + writer.log_dir.split('/')[-1] + f"_{epoch:03}.pt")
 
 print(model)
 
