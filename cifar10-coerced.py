@@ -1,0 +1,178 @@
+import torch
+from torch.utils.tensorboard import SummaryWriter
+
+from torchiteration import train, validate, predict, classification_step, predict_classification_step, build_optimizer, build_scheduler, save_hparams
+
+import numpy as np
+from sklearn.datasets import fetch_openml
+from sklearn.decomposition import PCA
+
+from shift import shift_towards_nearest_other_class
+
+import argparse
+parser = argparse.ArgumentParser()
+
+parser.add_argument('--model', type=str)
+parser.add_argument('--optimizer', type=str)
+parser.add_argument('--scheduler', type=str)
+
+parser.add_argument('--model-depth', type=int)
+parser.add_argument('--model-widen_factor', type=int)
+parser.add_argument('--model-drop_rate', type=float)
+
+parser.add_argument('--optimizer-lr', type=float)
+parser.add_argument('--optimizer-momentum', type=float)
+parser.add_argument('--optimizer-weight_decay', type=float)
+parser.add_argument('--optimizer-nesterov', action='store_true')
+parser.add_argument('--optimizer-betas', type=lambda s: tuple(map(float, s.split(','))))
+parser.add_argument('--optimizer-eps', type=float)
+
+parser.add_argument('--scheduler-T_max', type=int)
+parser.add_argument('--scheduler-eta_min', type=float)
+parser.add_argument('--scheduler-step_size', type=int)
+parser.add_argument('--scheduler-gamma', type=float)
+
+parser.add_argument('--dataset', type=str, default='cifar10')
+parser.add_argument('--extra_train', type=float)
+parser.add_argument('--n_components', type=int)
+parser.add_argument('--training_step', type=str, default='classification_step')
+parser.add_argument('--validation_step', type=str, default='classification_step')
+parser.add_argument('--batch_size', type=int, default=128)
+parser.add_argument('--epochs', type=int)
+parser.add_argument('--device', type=str, default='cuda')
+parser.add_argument('--epsilon', type=float)
+parser.add_argument('--note', type=str)
+
+config = {k: v for k, v in vars(parser.parse_args()).items() if v is not None}
+print(config)
+
+writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
+save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
+
+# model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
+# model = torch.hub.load('pytorch/vision:v0.10.0', , pretrained=False).to(config['device'])
+# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
+# model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False).to(config['device'])
+# model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_classes=10, depth=config['model_depth'], drop_rate=config['model_drop_rate'], widen_factor = config['model_widen_factor']).to(config['device'])
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class AlexNetCIFAR10(nn.Module):
+    def __init__(self, num_classes=10):
+        super(AlexNetCIFAR10, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 64, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(64, 192, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            
+            nn.Conv2d(192, 384, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            
+            nn.Conv2d(384, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            
+            nn.Conv2d(256, 256, kernel_size=3, padding=1),
+            nn.ReLU(inplace=True),
+            nn.MaxPool2d(kernel_size=2, stride=2)
+        )
+        
+        self.classifier = nn.Sequential(
+            nn.Dropout(),
+            nn.Linear(256 * 4 * 4, 4096),  # 4x4 because CIFAR10 size reduces after pooling
+            nn.ReLU(inplace=True),
+            
+            nn.Dropout(),
+            nn.Linear(4096, 4096),
+            nn.ReLU(inplace=True),
+            
+            nn.Linear(4096, num_classes)
+        )
+        
+    def forward(self, x):
+        x = self.features(x)
+        x = x.view(x.size(0), 256 * 4 * 4)  # flatten
+        x = self.classifier(x)
+        return x
+
+# Example to instantiate and test:
+model = AlexNetCIFAR10(num_classes=10).to(config['device'])
+
+# Move model to device (optional)
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# model = alexnet.to(config['device'])
+
+config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
+config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
+config['scheduler'] = build_scheduler(config, config['optimizer'])
+
+import torchvision
+
+# train_transform = torchvision.transforms.Compose([
+#     torchvision.transforms.RandomCrop(32, padding=4),
+#     torchvision.transforms.RandomHorizontalFlip(),
+#     torchvision.transforms.ToTensor(),
+#     torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+#     torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+# ])
+
+test_transform = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+])
+
+# train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
+# train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10', split='train', transform = test_transform)
+train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10-16-huang2021unlearnable', split='train', transform = test_transform)
+
+val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)
+
+# extra_size = int(config['extra_train'] * len(train_set))
+# train_indices, extra_indices = torch.utils.data.random_split(range(len(train_set)), [len(train_set) - extra_size, extra_size])
+
+# X_extra = train_set.data[extra_indices.indices]
+
+# shift = shift_towards_nearest_other_class(X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], n_components = config['n_components'], epsilon = config['epsilon'])
+# X_private = np.clip(X_extra + shift.reshape(-1, 32, 32, 3), 0, 255).astype(np.uint8)
+# print(train_set.data, X_extra, X_private, shift)
+
+# train_set.data[extra_indices.indices] = X_private
+
+
+train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
+val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
+
+import subprocess
+
+def get_gpu_usage():
+    result = subprocess.run(
+        ['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
+        stdout=subprocess.PIPE, text=True
+    )
+    usage = result.stdout.strip().split('\n')
+    for idx, line in enumerate(usage):
+        gpu_util, mem_used, mem_total = map(int, line.split(', '))
+        print(f"GPU {idx}: {gpu_util}% used, {mem_used}MB / {mem_total}MB memory")
+
+for epoch in range(config['epochs']):
+    get_gpu_usage()
+    if epoch > 0:
+        train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
+
+    validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
+
+    # torch.save(model.state_dict(), 'checkpoints/' + writer.log_dir.split('/')[-1] + f"_{epoch:03}.pt")
+
+print(model)
+
+outputs = predict(model, predict_classification_step, val_loader = val_loader, **config)
+
+# print(outputs.keys(), outputs['predictions'])
+
+writer.flush()
+writer.close()
