@@ -75,16 +75,16 @@ test_transform = torchvision.transforms.Compose([
 train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)
 
-extra_size = int(config['extra_train'] * len(train_set))
-train_indices, extra_indices = torch.utils.data.random_split(range(len(train_set)), [len(train_set) - extra_size, extra_size])
+# extra_size = int(config['extra_train'] * len(train_set))
+# train_indices, extra_indices = torch.utils.data.random_split(range(len(train_set)), [len(train_set) - extra_size, extra_size])
 
-X_extra = train_set.data[extra_indices.indices]
+# X_extra = train_set.data[extra_indices.indices]
 
-shift = shift_towards_nearest_other_class(X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], n_components = config['n_components'], epsilon = config['epsilon'])
-X_private = np.clip(X_extra + shift.reshape(-1, 32, 32, 3), 0, 255).astype(np.uint8)
-print(train_set.data, X_extra, X_private, shift)
+# shift = shift_towards_nearest_other_class(X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], X_extra.reshape(-1, 3072), np.array(train_set.targets)[extra_indices.indices], n_components = config['n_components'], epsilon = config['epsilon'])
+# X_private = np.clip(X_extra + shift.reshape(-1, 32, 32, 3), 0, 255).astype(np.uint8)
+# print(train_set.data, X_extra, X_private, shift)
 
-train_set.data[extra_indices.indices] = X_private
+# train_set.data[extra_indices.indices] = X_private
 
 
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
