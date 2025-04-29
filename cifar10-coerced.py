@@ -8,6 +8,7 @@ from sklearn.datasets import fetch_openml
 from sklearn.decomposition import PCA
 
 from shift import shift_towards_nearest_other_class
+from utils import get_gpu_usage
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -32,7 +33,7 @@ parser.add_argument('--scheduler-eta_min', type=float)
 parser.add_argument('--scheduler-step_size', type=int)
 parser.add_argument('--scheduler-gamma', type=float)
 
-parser.add_argument('--dataset', type=str, default='cifar10')
+parser.add_argument('--dataset', type=str)
 parser.add_argument('--extra_train', type=float)
 parser.add_argument('--n_components', type=int)
 parser.add_argument('--training_step', type=str, default='classification_step')
@@ -43,108 +44,62 @@ parser.add_argument('--device', type=str, default='cuda')
 parser.add_argument('--epsilon', type=float)
 parser.add_argument('--note', type=str)
 
+parser.add_argument('--atk', type=str)
+parser.add_argument('--atk-eps', type=float)
+parser.add_argument('--atk-alpha', type=float)
+parser.add_argument('--atk-steps', type=int)
+
+
 config = {k: v for k, v in vars(parser.parse_args()).items() if v is not None}
 print(config)
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
-# model = torch.hub.load('chenyaofo/pytorch-cifar-models', 'cifar10_resnet20', pretrained=False).to(config['device']).to(config['device'])
-# model = torch.hub.load('pytorch/vision:v0.10.0', , pretrained=False).to(config['device'])
-# model = torch.hub.load('cat-claws/nn', 'resnet_cifar', pretrained= False, num_classes=10, blocks=14, bottleneck=False, in_channels = 3).to(config['device'])
-model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False).to(config['device'])
-# model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, num_classes=10, depth=config['model_depth'], drop_rate=config['model_drop_rate'], widen_factor = config['model_widen_factor']).to(config['device'])
+# model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False).to(config['device'])
 
-# import torchvision.models as models
-
-# # Example: ResNet18
-# model = models.resnet18(weights="IMAGENET1K_V1")  # pretrained on ImageNet
-# # Modify first convolution layer (if needed) and final layer for 10 classes
-# model.conv1 = torch.nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-# model.maxpool = torch.nn.Identity()  # remove the maxpool layer
-# model.fc = torch.nn.Linear(512, 10)  # CIFAR-10 has 10 classes
-
-# model = model.to(config['device'])
-
-# from pytorchcv.model_provider import get_model as ptcv_get_model
-
-# # Load a model pretrained on SVHN
-# model = ptcv_get_model("resnet20_svhn", pretrained=True)
-
-# # Move to device
-# device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# model = model.to(config['device'])
+from pytorchcv.model_provider import get_model as ptcv_get_model
+model = ptcv_get_model("resnet20_svhn", pretrained=True).to(config['device'])
 
 
 config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
 config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
 config['scheduler'] = build_scheduler(config, config['optimizer'])
 
+if 'atk' in config:
+    from utils import build_atk
+    config['atk'] = build_atk(config, model)
+
 import torchvision
 
-# train_transform = torchvision.transforms.Compose([
-#     torchvision.transforms.RandomCrop(32, padding=4),
-#     torchvision.transforms.RandomHorizontalFlip(),
-#     torchvision.transforms.ToTensor(),
-#     torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-#     torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
-# ])
-
-# test_transform = torchvision.transforms.Compose([
-#     torchvision.transforms.ToTensor(),
-#     torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-# ])
-
-import torchvision.transforms as transforms
-
-# Transforms for training
-train_transform = transforms.Compose([
-    transforms.RandomCrop(32, padding=4),  # Randomly crop with padding
-    transforms.RandomHorizontalFlip(),     # Randomly flip horizontally
-    transforms.ColorJitter(                 # Randomly change brightness, contrast, saturation
-        brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
-    ),
-    transforms.RandomApply([                # Randomly apply Gaussian Blur
-        transforms.GaussianBlur(kernel_size=3)
-    ], p=0.2),
-    transforms.ToTensor(),                  # Convert to tensor
-    transforms.Normalize(                   # Normalize with CIFAR-10 mean and std
-        mean=[0.4914, 0.4822, 0.4465],
-        std=[0.2023, 0.1994, 0.2010]
-    )
+train_transform = torchvision.transforms.Compose([
+    torchvision.transforms.RandomCrop(32, padding=4),
+    torchvision.transforms.RandomHorizontalFlip(),
+    # torchvision.transforms.ColorJitter(                 # Randomly change brightness, contrast, saturation
+    #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+    # ),
+    # torchvision.transforms.RandomApply([                # Randomly apply Gaussian Blur
+    #     torchvision.transforms.GaussianBlur(kernel_size=3)
+    # ], p=0.2),
+    torchvision.transforms.ToTensor(),
+    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
 ])
 
-# Transforms for testing / validation
-test_transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.4914, 0.4822, 0.4465],
-        std=[0.2023, 0.1994, 0.2010]
-    )
+test_transform = torchvision.transforms.Compose([
+    torchvision.transforms.ToTensor(),
+    # torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
 
 # train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
-# train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10', split='train', transform = test_transform)
+train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = config['dataset'], split='train', transform = test_transform)
 # train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10-16-wen2023adversarial-push', split='train', transform = test_transform)
-# train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10-16-huang2021unlearnable', split='train', transform = train_transform)
-train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison-1', name = 'cifar10-centre36pix-index', split='train', transform = test_transform)
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)
 
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
 val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
-
-import subprocess
-
-def get_gpu_usage():
-    result = subprocess.run(
-        ['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
-        stdout=subprocess.PIPE, text=True
-    )
-    usage = result.stdout.strip().split('\n')
-    for idx, line in enumerate(usage):
-        gpu_util, mem_used, mem_total = map(int, line.split(', '))
-        print(f"GPU {idx}: {gpu_util}% used, {mem_used}MB / {mem_total}MB memory")
 
 for epoch in range(config['epochs']):
     get_gpu_usage()

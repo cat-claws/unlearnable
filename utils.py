@@ -56,3 +56,24 @@ def flatten_dict(d, parent_key='', sep='.'):
             items.append((new_key, v))
     
     return dict(items)
+
+import torchattacks
+from torchiteration import get_kwargs_for
+
+def build_atk(config, model):
+    cls = getattr(torchattacks, config['atk'])
+    return cls(model, **get_kwargs_for(cls, config, "optimizer"))
+
+
+
+import subprocess
+
+def get_gpu_usage():
+    result = subprocess.run(
+        ['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
+        stdout=subprocess.PIPE, text=True
+    )
+    usage = result.stdout.strip().split('\n')
+    for idx, line in enumerate(usage):
+        gpu_util, mem_used, mem_total = map(int, line.split(', '))
+        print(f"GPU {idx}: {gpu_util}% used, {mem_used}MB / {mem_total}MB memory")
