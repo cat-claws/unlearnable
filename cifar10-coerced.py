@@ -52,6 +52,7 @@ parser.add_argument('--atk-steps', type=int)
 
 config = {k: v for k, v in vars(parser.parse_args()).items() if v is not None}
 print(config)
+print(parser)
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
