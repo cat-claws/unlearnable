@@ -46,6 +46,7 @@ poetry.lock
 
 checkpoints/
 runs/
+runs*/*
 
 data/
 *.sh

@@ -8,6 +8,7 @@ from sklearn.datasets import fetch_openml
 from sklearn.decomposition import PCA
 
 from shift import shift_towards_nearest_other_class
+from utils import get_gpu_usage
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -91,17 +92,6 @@ val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
 val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
 
-import subprocess
-
-def get_gpu_usage():
-    result = subprocess.run(
-        ['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'],
-        stdout=subprocess.PIPE, text=True
-    )
-    usage = result.stdout.strip().split('\n')
-    for idx, line in enumerate(usage):
-        gpu_util, mem_used, mem_total = map(int, line.split(', '))
-        print(f"GPU {idx}: {gpu_util}% used, {mem_used}MB / {mem_total}MB memory")
 
 for epoch in range(config['epochs']):
     get_gpu_usage()

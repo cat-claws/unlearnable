@@ -1,7 +1,7 @@
 import torch
 from torch.utils.tensorboard import SummaryWriter
 
-from torchiteration import train, validate, predict, classification_step, predict_classification_step, build_optimizer, build_scheduler, save_hparams
+from torchiteration import train, validate, predict, classification_step, predict_classification_step, build_optimizer, build_scheduler, save_hparams, attacked_classification_step
 
 import numpy as np
 from sklearn.datasets import fetch_openml
@@ -36,12 +36,12 @@ parser.add_argument('--scheduler-gamma', type=float)
 parser.add_argument('--dataset', type=str)
 parser.add_argument('--extra_train', type=float)
 parser.add_argument('--n_components', type=int)
-parser.add_argument('--training_step', type=str, default='classification_step')
+parser.add_argument('--training_step', type=str)
 parser.add_argument('--validation_step', type=str, default='classification_step')
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--epochs', type=int)
 parser.add_argument('--device', type=str, default='cuda')
-parser.add_argument('--epsilon', type=float)
+parser.add_argument('--posion-eps', type=float)
 parser.add_argument('--note', type=str)
 
 parser.add_argument('--atk', type=str)
@@ -56,10 +56,12 @@ print(config)
 writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
-# model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False).to(config['device'])
 
-from pytorchcv.model_provider import get_model as ptcv_get_model
-model = ptcv_get_model("resnet20_svhn", pretrained=True).to(config['device'])
+model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
+
+if config['model'] == "resnet20_svhn":
+    from pytorchcv.model_provider import get_model as ptcv_get_model
+    model = ptcv_get_model("resnet20_svhn", pretrained=True).to(config['device'])
 
 
 config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
@@ -93,9 +95,8 @@ test_transform = torchvision.transforms.Compose([
 ])
 
 
-# train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
 train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = config['dataset'], split='train', transform = test_transform)
-# train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10-16-wen2023adversarial-push', split='train', transform = test_transform)
+# train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)
 
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
