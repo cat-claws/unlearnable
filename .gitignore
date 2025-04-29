@@ -49,4 +49,4 @@ runs/
 runs*/*
 
 data/
-*.sh
+cluster.sh

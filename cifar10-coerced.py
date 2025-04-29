@@ -58,11 +58,13 @@ writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flus
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
 
-model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
-
 if config['model'] == "resnet20_svhn":
     from pytorchcv.model_provider import get_model as ptcv_get_model
     model = ptcv_get_model("resnet20_svhn", pretrained=True).to(config['device'])
+
+else:
+    model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
+
 
 
 config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
