@@ -52,7 +52,6 @@ parser.add_argument('--atk-steps', type=int)
 
 config = {k: v for k, v in vars(parser.parse_args()).items() if v is not None}
 print(config)
-print(parser)
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
@@ -87,14 +86,14 @@ train_transform = torchvision.transforms.Compose([
     #     torchvision.transforms.GaussianBlur(kernel_size=3)
     # ], p=0.2),
     torchvision.transforms.ToTensor(),
-    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
 ])
 
 test_transform = torchvision.transforms.Compose([
     torchvision.transforms.ToTensor(),
     # torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
 
 
