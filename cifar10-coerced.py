@@ -60,6 +60,11 @@ save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 if config['model'] == "resnet20_svhn":
     from pytorchcv.model_provider import get_model as ptcv_get_model
     model = ptcv_get_model("resnet20_svhn", pretrained=True).to(config['device'])
+elif config['model'] == 'vit':
+    from vit import ViT
+    b,c,h,w = 4, 3, 32, 32
+    model = ViT(in_c=c, num_classes= 10, img_size=h, patch=16, dropout=0.1, num_layers=7, hidden=384, head=12, mlp_hidden=384, is_cls_token=False)
+    model = model.to(config['device'])
 
 else:
     model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
@@ -77,8 +82,8 @@ if 'atk' in config:
 import torchvision
 
 train_transform = torchvision.transforms.Compose([
-    torchvision.transforms.RandomCrop(32, padding=4),
-    torchvision.transforms.RandomHorizontalFlip(),
+    # torchvision.transforms.RandomCrop(32, padding=4),
+    # torchvision.transforms.RandomHorizontalFlip(),
     # torchvision.transforms.ColorJitter(                 # Randomly change brightness, contrast, saturation
     #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
     # ),
@@ -86,7 +91,8 @@ train_transform = torchvision.transforms.Compose([
     #     torchvision.transforms.GaussianBlur(kernel_size=3)
     # ], p=0.2),
     torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+    # torchvision.transforms.Lambda(lambda x: x + 0.1 * torch.randn_like(x))
+    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
     # torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
 ])
 
@@ -97,7 +103,7 @@ test_transform = torchvision.transforms.Compose([
 ])
 
 
-train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = config['dataset'], split='train', transform = test_transform)
+train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = config['dataset'], split='train', transform = train_transform)
 # train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)
 
