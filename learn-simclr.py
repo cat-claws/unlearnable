@@ -6,6 +6,8 @@ import torchvision
 import torchvision.transforms as T
 from torchvision.models import resnet18
 from torch.utils.data import Dataset, DataLoader
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import accuracy_score
 
 # ----- SimCLR Transform -----
 class SimCLRTransform:
@@ -22,7 +24,7 @@ class SimCLRTransform:
     def __call__(self, x):
         return self.transform(x), self.transform(x)
 
-# ----- Dataset Wrapper -----
+# ----- SimCLR Dataset -----
 class SimCLRDataset(Dataset):
     def __init__(self, base_dataset):
         self.base_dataset = base_dataset
@@ -54,7 +56,7 @@ class SimCLRModel(nn.Module):
     def __init__(self, base_encoder, proj_dim=128):
         super().__init__()
         self.encoder = base_encoder
-        self.encoder.fc = nn.Identity()  # Remove classification head
+        self.encoder.fc = nn.Identity()  # remove final classifier
         self.projector = ProjectionHead(512, proj_dim)
 
     def forward(self, x):
@@ -77,22 +79,59 @@ def nt_xent_loss(z1, z2, temperature=0.5):
     loss = -torch.log(torch.exp(positives) / torch.exp(sim).sum(dim=1))
     return loss.mean()
 
-# ----- Training Function -----
+# ----- Embedding Extraction -----
+def extract_embeddings(model, dataset, batch_size=256):
+    model.eval()
+    dataloader = DataLoader(dataset, batch_size=batch_size)
+    embeddings = []
+    labels = []
+    with torch.no_grad():
+        for x, y in dataloader:
+            x = x.to(next(model.parameters()).device)
+            h = model.encoder(x)
+            h = h.view(h.size(0), -1)
+            embeddings.append(h.cpu())
+            labels.extend(y)
+    return torch.cat(embeddings), torch.tensor(labels)
+
+# ----- Evaluation (k-NN on frozen embeddings) -----
+def evaluate_knn(model, train_dataset, test_dataset, k=5):
+    print("Extracting embeddings for k-NN evaluation...")
+    z_train, y_train = extract_embeddings(model, train_dataset)
+    z_test, y_test = extract_embeddings(model, test_dataset)
+
+    knn = KNeighborsClassifier(n_neighbors=k, metric='cosine')
+    knn.fit(z_train, y_train)
+    preds = knn.predict(z_test)
+    acc = accuracy_score(y_test, preds)
+    print(f"SimCLR k-NN Accuracy (k={k}): {acc:.4f}")
+
+# ----- Main Training + Evaluation -----
 def train_simclr(epochs=10, batch_size=256, lr=1e-3):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    base_train = torchvision.datasets.CIFAR10(root="./data", train=True, download=True,)
-    train_dataset = SimCLRDataset(base_train)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4, drop_last=True)
+    # Training data
+    train_base = torchvision.datasets.CIFAR10(root="./data", train=True, download=True, )
+    train_dataset = SimCLRDataset(train_base)
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=2, drop_last=True)
 
-    resnet = resnet18(pretrained=False)
-    model = SimCLRModel(resnet).to(device)
+    # Test data for k-NN eval
+    test_dataset = torchvision.datasets.CIFAR10(root="./data", train=False, download=True,
+                                                transform=T.Compose([T.ToTensor(), T.Normalize((0.5,), (0.5,))]))
+    train_labeled_dataset = torchvision.datasets.CIFAR10(root="./data", train=True, transform=T.Compose([
+        T.ToTensor(), T.Normalize((0.5,), (0.5,))
+    ]))
+
+    # Model
+    base_encoder = resnet18()
+    model = SimCLRModel(base_encoder).to(device)
     optimizer = optim.Adam(model.parameters(), lr=lr)
 
+    # Training loop
     for epoch in range(epochs):
         model.train()
         total_loss = 0
-        for batch_idx, (x1, x2) in enumerate(train_loader):
+        for x1, x2 in train_loader:
             x1, x2 = x1.to(device), x2.to(device)
             z1 = model(x1)
             z2 = model(x2)
@@ -101,10 +140,12 @@ def train_simclr(epochs=10, batch_size=256, lr=1e-3):
             optimizer.zero_grad()
             loss.backward()
             optimizer.step()
-
             total_loss += loss.item()
 
-        print(f"Epoch {epoch+1}, Loss: {total_loss/len(train_loader):.4f}")
+        print(f"Epoch {epoch+1}, Loss: {total_loss / len(train_loader):.4f}")
 
-# Run the training
-train_simclr(20)
+    # Final evaluation
+    evaluate_knn(model, train_labeled_dataset, test_dataset)
+
+# Run training and evaluation
+train_simclr(epochs=10)  # You can increase epochs to 100+ for real performance
