@@ -10,9 +10,11 @@
 
 # srun --partition=researchlong --gres=gpu:1 --constraint=a100 python cifar10-coerced.py  --dataset 'cifar10-4-wen2023adversarial-pull' --model resnet18_cifar --training_step attacked_classification_step  --atk PGD --atk-eps 0.0156862745 --atk-alpha 0.0031372549 --atk-steps 10 --optimizer AdamW --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
 
-# srun --partition=researchlong --gres=gpu:1 --constraint=l40 python learn_similar.py  
+srun --partition=researchlong --gres=gpu:1 --constraint=a40 python -u learn-similar.py  
 
-srun --partition=researchlong --gres=gpu:1 --constraint=a5000 python learn-info.py  
+# srun --partition=researchlong --gres=gpu:1 --constraint=a5000 python learn-info.py  
+
+# srun --partition=researchlong --gres=gpu:1 --constraint=v100-32gb python -u learn-simclr.py  
 
 # 0.03137254901 0.00784313725
 # 0.06274509802 0.0156862745
