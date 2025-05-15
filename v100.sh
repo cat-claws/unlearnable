@@ -26,8 +26,12 @@
 
 # srun --partition=researchlong --gres=gpu:1 --constraint=h100 python -u cifar10.py  
 
-srun --partition=sunjunresearch --gres=gpu:1 python -u cifar10-erm.py  
+# srun --partition=sunjunresearch --gres=gpu:1 python -u cifar10-erm.py  
 
 # srun --partition=sunjunresearch --gres=gpu:2 python -u cifar10.py  
+
+
+srun --partition=researchlong --gres=gpu:1 --constraint=a100 python -u cifar10-coerced.py --dataset 'cifar10-4-wen2023adversarial-pull' --path poison --model resnet_cifar --model-block "" --model-layers 2 2 2 2 --training_step classification_step --optimizer SGD --optimizer-lr 0.1 --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
+
 
 read -p "Press Enter to exit..."

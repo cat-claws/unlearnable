@@ -8,7 +8,7 @@ from sklearn.datasets import fetch_openml
 from sklearn.decomposition import PCA
 
 from shift import shift_towards_nearest_other_class
-from utils import get_gpu_usage
+# from utils import get_gpu_usage
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -20,6 +20,9 @@ parser.add_argument('--scheduler', type=str)
 parser.add_argument('--model-depth', type=int)
 parser.add_argument('--model-widen_factor', type=int)
 parser.add_argument('--model-drop_rate', type=float)
+parser.add_argument('--model-layers', type=int, nargs='+')
+parser.add_argument('--model-block', type=str)
+
 
 parser.add_argument('--optimizer-lr', type=float)
 parser.add_argument('--optimizer-momentum', type=float)
@@ -34,6 +37,8 @@ parser.add_argument('--scheduler-step_size', type=int)
 parser.add_argument('--scheduler-gamma', type=float)
 
 parser.add_argument('--dataset', type=str)
+parser.add_argument('--path', type=str)
+
 parser.add_argument('--extra_train', type=float)
 parser.add_argument('--n_components', type=int)
 parser.add_argument('--training_step', type=str)
@@ -57,17 +62,7 @@ writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flus
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
 
-if config['model'] == "resnet20_svhn":
-    from pytorchcv.model_provider import get_model as ptcv_get_model
-    model = ptcv_get_model("resnet20_svhn", pretrained=True).to(config['device'])
-elif config['model'] == 'vit':
-    from vit import ViT
-    b,c,h,w = 4, 3, 32, 32
-    model = ViT(in_c=c, num_classes= 10, img_size=h, patch=16, dropout=0.1, num_layers=7, hidden=384, head=12, mlp_hidden=384, is_cls_token=False)
-    model = model.to(config['device'])
-
-else:
-    model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
+model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
 
 
 
@@ -103,15 +98,15 @@ test_transform = torchvision.transforms.Compose([
 ])
 
 
-train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = config['dataset'], split='train', transform = train_transform)
+train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = train_transform)
 # train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)
 
-train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=8, pin_memory=True)
-val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=8, pin_memory=True)
+train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=2, pin_memory=True)
+val_loader =  torch.utils.data.DataLoader(val_set, batch_size=config['batch_size'], shuffle=False, num_workers=2, pin_memory=True)
 
 for epoch in range(config['epochs']):
-    get_gpu_usage()
+    # get_gpu_usage()
     if epoch > 0:
         train(model, train_loader = train_loader, epoch = epoch, writer = writer, **config)
 
