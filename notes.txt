@@ -1,0 +1,52 @@
+Epoch [1/3] Train Acc: 27.95% 
+Epoch [2/3] Train Acc: 47.57% 
+Epoch [3/3] Train Acc: 54.03% 
+0.818
+Epoch [1/4] Train Acc: 25.36% 
+Epoch [2/4] Train Acc: 45.21% 
+Epoch [3/4] Train Acc: 55.42% 
+Epoch [4/4] Train Acc: 59.76% 
+0.804
+Epoch [1/200] Train Acc: 23.33% 
+Epoch [2/200] Train Acc: 40.52% 
+Epoch [3/200] Train Acc: 51.20% 
+Epoch [4/200] Train Acc: 60.03% 
+Epoch [5/200] Train Acc: 66.84% 
+Epoch [6/200] Train Acc: 71.33% 
+Epoch [7/200] Train Acc: 75.22% 
+Epoch [8/200] Train Acc: 78.61% 
+Epoch [9/200] Train Acc: 80.54% 
+Epoch [1/200] Train Acc: 11.53% 
+Epoch [2/200] Train Acc: 12.93% 
+Epoch [3/200] Train Acc: 20.52% 
+Epoch [4/200] Train Acc: 30.96% 
+Epoch [5/200] Train Acc: 39.22% 
+Epoch [6/200] Train Acc: 46.09% 
+Epoch [7/200] Train Acc: 53.08% 
+Epoch [8/200] Train Acc: 59.44% 
+Epoch [9/200] Train Acc: 64.33% 
+Epoch [10/200] Train Acc: 67.65% 
+Epoch [11/200] Train Acc: 70.86% 
+Epoch [12/200] Train Acc: 73.28% 
+Epoch [13/200] Train Acc: 75.86% 
+Epoch [14/200] Train Acc: 78.03% 
+Epoch [15/200] Train Acc: 80.08% 
+Epoch [16/200] Train Acc: 81.83% 
+Epoch [17/200] Train Acc: 82.86% 
+Epoch [18/200] Train Acc: 84.19% 
+Epoch [19/200] Train Acc: 84.93% 
+Epoch [20/200] Train Acc: 85.98% 
+Epoch [21/200] Train Acc: 86.77% 
+Epoch [22/200] Train Acc: 87.48% 
+Epoch [23/200] Train Acc: 88.40% 
+Epoch [24/200] Train Acc: 88.97% 
+Epoch [25/200] Train Acc: 89.37% 
+Epoch [26/200] Train Acc: 90.14% 
+Epoch [27/200] Train Acc: 90.05% 
+Epoch [28/200] Train Acc: 90.76% 
+Epoch [29/200] Train Acc: 91.13% 
+Epoch [1/1] Train Acc: 13.39% 
+0.898
+Epoch [1/1] Train Acc: 27.58% 
+0.894
+Epoch [1/1] Train Acc: 24.34% 

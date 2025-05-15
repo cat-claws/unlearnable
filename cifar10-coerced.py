@@ -77,8 +77,8 @@ if 'atk' in config:
 import torchvision
 
 train_transform = torchvision.transforms.Compose([
-    # torchvision.transforms.RandomCrop(32, padding=4),
-    # torchvision.transforms.RandomHorizontalFlip(),
+    torchvision.transforms.RandomCrop(32, padding=4),
+    torchvision.transforms.RandomHorizontalFlip(),
     # torchvision.transforms.ColorJitter(                 # Randomly change brightness, contrast, saturation
     #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
     # ),
