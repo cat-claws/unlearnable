@@ -28,5 +28,6 @@
 
 srun --partition=sunjunresearch --gres=gpu:1 python -u cifar10-erm.py  
 
+# srun --partition=sunjunresearch --gres=gpu:2 python -u cifar10.py  
 
 read -p "Press Enter to exit..."

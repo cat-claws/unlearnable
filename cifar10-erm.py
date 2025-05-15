@@ -53,16 +53,6 @@ test_loader = torch.utils.data.DataLoader(test_dataset,
                                           shuffle=False,
                                           num_workers=4)
 
-# Model
-# def get_resnet18_for_cifar10():
-#     model = resnet18(weights=None)
-#     model.conv1 = nn.Conv2d(3, 64, kernel_size=3, stride=1, padding=1, bias=False)
-#     model.maxpool = nn.Identity()
-#     model.fc = nn.Linear(512, 10)
-#     return model
-
-# model = get_resnet18_for_cifar10().to(device)
-
 model = torch.hub.load(
     'cat-claws/nn',
     'resnet_cifar',
