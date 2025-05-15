@@ -26,7 +26,8 @@ cifar = fetch_openml('CIFAR_10', cache=True, as_frame=False)
 X = cifar.data.astype(np.uint8).reshape(-1, 3, 32, 32)
 y = cifar.target.astype(np.int64)
 
-X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=10000)#, random_state=42)
+# X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=10000)#, random_state=42)
+X_train, X_val, y_train, y_val = X[:50000], X[50000:], y[:50000], y[50000:]#, random_state=42)
 
 train_transform = transforms.Compose([
     transforms.ToPILImage(),
@@ -56,8 +57,8 @@ class TransformTensorDataset(TensorDataset):
             x = self.transform(x)
         return x, y
 
-train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
-val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
+train_set = TransformTensorDataset(torch.from_numpy(X_train)/255, torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
+val_set = TransformTensorDataset(torch.from_numpy(X_val)/255, torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
 
 
 trainloader = DataLoader(train_set, batch_size=512, shuffle=True, num_workers=8, pin_memory=True)

@@ -14,7 +14,7 @@
 
 # srun --partition=researchlong --gres=gpu:1 --constraint=a5000 python learn-info.py  
 
-srun --partition=researchlong --gres=gpu:1 --constraint=v100-32gb python -u learn-simclr.py  
+# srun --partition=researchlong --gres=gpu:1 --constraint=v100-32gb python -u learn-simclr.py  
 
 # 0.03137254901 0.00784313725
 # 0.06274509802 0.0156862745
@@ -24,3 +24,9 @@ srun --partition=researchlong --gres=gpu:1 --constraint=v100-32gb python -u lear
 # srun --partition=researchlong --gres=gpu:1 python cifar10-coerced.py --dataset 'cifar10-8-huang2021unlearnable' --model resnet18_cifar --training_step classification_step --optimizer SGD --optimizer-lr 0.1 --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
 
 
+# srun --partition=researchlong --gres=gpu:1 --constraint=h100 python -u cifar10.py  
+
+srun --partition=sunjunresearch --gres=gpu:1 python -u cifar10-erm.py  
+
+
+read -p "Press Enter to exit..."
