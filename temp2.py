@@ -9,7 +9,7 @@ import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from torchvision.models import resnet18
 
-from data import TransformTensorDataset
+# from data import TransformTensorDataset
 
 def seed_everything(seed=42):
     # random.seed(seed)
@@ -42,7 +42,20 @@ test_transform = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
 ])
-print(X_train)
+
+from torch.utils.data import TensorDataset
+
+class TransformTensorDataset(TensorDataset):
+    def __init__(self, *tensors, transform=None):
+        super().__init__(*tensors)
+        self.transform = transform
+
+    def __getitem__(self, index):
+        x, y = super().__getitem__(index)
+        if self.transform:
+            x = self.transform(x)
+        return x, y
+
 train_set = TransformTensorDataset(torch.tensor(X_train, dtype=torch.float32), torch.tensor(y_train, dtype=torch.int64), transform=train_transform)
 val_set = TransformTensorDataset(torch.tensor(X_val, dtype=torch.float32), torch.tensor(y_val, dtype=torch.int64), transform=test_transform)
 
