@@ -8,7 +8,7 @@
 # srun --partition=sunjunresearch --gres=gpu:1 python cifar10-coerced.py --model resnet_cifar  --optimizer SGD --optimizer-lr 0.1 --scheduler CosineAnnealingLR --scheduler-T_max 200 --epochs 201 --note "simple cifar resnet"
 
 
-# srun --partition=researchlong --gres=gpu:1 --constraint=a100 python cifar10-coerced.py  --dataset 'cifar10-4-wen2023adversarial-pull' --model resnet18_cifar --training_step attacked_classification_step  --atk PGD --atk-eps 0.0156862745 --atk-alpha 0.0031372549 --atk-steps 10 --optimizer AdamW --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
+# srun --partition=researchlong --gres=gpu:1 --constraint=a100 python cifar10-coerced.py  --dataset 'cifar10-4-wen2023adversarial-pull' --model resnet_cifar --training_step attacked_classification_step  --atk PGD --atk-eps 0.0156862745 --atk-alpha 0.0031372549 --atk-steps 10 --optimizer AdamW --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
 
 # srun --partition=researchlong --gres=gpu:1 --constraint=a40 python -u learn-similar.py  
 
@@ -31,7 +31,7 @@
 # srun --partition=sunjunresearch --gres=gpu:2 python -u cifar10.py  
 
 
-# srun --partition=researchlong --gres=gpu:1 --constraint=l40 python -u cifar10-coerced.py --dataset 'wideresnet28-erm-normalise' --path trial --model resnet_cifar --model-block "" --model-layers 2 2 2 2 --training_step classification_step --optimizer SGD --optimizer-lr 0.1 --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
+# srun --partition=researchlong --gres=gpu:1 --constraint=l40 python -u cifar10-coerced.py --dataset 'cifar10-8-8-wen2023adversarial-pull' --path poison --model resnet_cifar --model-block "" --model-layers 2 2 2 2 --training_step classification_step --optimizer SGD --optimizer-lr 0.1 --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201 --private_ratio 0.5 --train_transform cifar10_T --test_transform cifar10_T
 
 srun --partition=sunjunresearch --gres=gpu:1 python cifar-10-retrain.py >> notes2.txt
 
