@@ -74,11 +74,11 @@ import torchvision
 
 datasets = [
     torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10', split='train', transform = transforms(config.get('train_transform', None))),
-    torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = transforms(config.pop('train_transform', None)))
+    torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = transforms(config.pop('train_transform', None))) if config['dataset'] != '' else None
 ]
 from mix import MultiDatasetMixer
 train_set = MultiDatasetMixer(datasets, [1 - config['private_ratio'], config['private_ratio']], seed=123)
-
+print('train length: ', len(train_set))
 
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transforms(config.pop('test_transform', None)))
 
