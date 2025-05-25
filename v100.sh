@@ -31,6 +31,8 @@
 # srun --partition=sunjunresearch --gres=gpu:2 python -u cifar10.py  
 
 
-srun --partition=researchlong --gres=gpu:1 --constraint=l40 python -u cifar10-coerced.py --dataset 'wideresnet28-erm-normalise' --path trial --model resnet_cifar --model-block "" --model-layers 2 2 2 2 --training_step classification_step --optimizer SGD --optimizer-lr 0.1 --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
+# srun --partition=researchlong --gres=gpu:1 --constraint=l40 python -u cifar10-coerced.py --dataset 'wideresnet28-erm-normalise' --path trial --model resnet_cifar --model-block "" --model-layers 2 2 2 2 --training_step classification_step --optimizer SGD --optimizer-lr 0.1 --scheduler CosineAnnealingLR  --scheduler-T_max 200 --epochs 201
+
+srun --partition=sunjunresearch --gres=gpu:1 python cifar-10-retrain.py >> notes2.txt
 
 read -p "Press Enter to exit..."

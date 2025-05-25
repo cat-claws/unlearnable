@@ -37,8 +37,8 @@ config = {
     'training_step': 'classification_step',
     'validation_step': 'classification_step',
 
-    'batch_size': 512,
-    'epochs': 200,
+    'batch_size': 5120,
+    'epochs': 20,
 
     'optimizer': 'SGD',
     'optimizer_momentum': 0.9,
@@ -46,7 +46,7 @@ config = {
     'optimizer_lr': 0.1,
 
     'scheduler': 'CosineAnnealingLR',
-    'scheduler_T_max': 200,
+    'scheduler_T_max': 20,
 
     'device': 'cuda' if torch.cuda.is_available() else 'cpu'
 }
@@ -110,8 +110,8 @@ def evaluate(model, loader, criterion):
 
 
 
-num_epochs = 1
-batch_size = 128
+num_epochs = 20
+batch_size = 128 *16
 learning_rate = 0.1
 weight_decay = 5e-4
 momentum = 0.9
@@ -213,20 +213,27 @@ for x_ in Attack(torch.optim.AdamW, [X], steps = 200, foreach=False, maximize=Tr
     error.backward()
 
 
-p_data = x_[0].detach().clamp(X - 8/255, X + 8/255).clamp(0, 1)
+    p_data = x_[0].detach().clamp(X - 8/255, X + 8/255).clamp(0, 1)
 
 
-(p_data - X).max()
+    (p_data - X).max()
 
-p_loader =  torch.utils.data.DataLoader(torch.utils.data.TensorDataset(p_data, y), batch_size=config['batch_size'], shuffle=False)
-outputs = predict(model, feature_extraction_step, val_loader = p_loader, **config)
-p_features = torch.tensor(outputs['predictions'])
+    p_loader =  torch.utils.data.DataLoader(torch.utils.data.TensorDataset(p_data, y), batch_size=config['batch_size'], shuffle=False)
+    outputs = predict(model, feature_extraction_step, val_loader = p_loader, **config)
+    p_features = torch.tensor(outputs['predictions'])
 
 
-from upload_utils import upload_tensor_dataset_to_hub
+    from upload_utils import upload_tensor_dataset_to_hub
 
+    upload_tensor_dataset_to_hub(
+        x_tensor=p_data,
+        dataset_repo="trial",
+        config_name="resnet18-retrain",
+        private=False,
+        token = ''
+    )
 
 # tsne_plot(train_features.numpy(), np.array(train_set.targets))
 
-
+# hp_featuresf_WhoLgQeIRp_featuressnPAmCHdnuYp_featuresnahwwviUhTXgDO
 # tsne_plot(p_features.numpy(), np.array(train_set.targets))
