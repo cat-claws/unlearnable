@@ -59,20 +59,20 @@ config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
 config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
 config['scheduler'] = build_scheduler(config, config['optimizer'])
 
-import torchvision
+# import torchvision
 
-# train_transform = torchvision.transforms.Compose([
-#     torchvision.transforms.RandomCrop(32, padding=4),
-#     torchvision.transforms.RandomHorizontalFlip(),
+# # train_transform = torchvision.transforms.Compose([
+# #     torchvision.transforms.RandomCrop(32, padding=4),
+# #     torchvision.transforms.RandomHorizontalFlip(),
+# #     torchvision.transforms.ToTensor(),
+# #     torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+# #     torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+# # ])
+
+# test_transform = torchvision.transforms.Compose([
 #     torchvision.transforms.ToTensor(),
 #     torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-#     torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
 # ])
-
-test_transform = torchvision.transforms.Compose([
-    torchvision.transforms.ToTensor(),
-    torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-])
 
 train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=test_transform)
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=test_transform)

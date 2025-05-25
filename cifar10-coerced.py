@@ -8,7 +8,6 @@ from sklearn.datasets import fetch_openml
 from sklearn.decomposition import PCA
 
 from shift import shift_towards_nearest_other_class
-# from utils import get_gpu_usage
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -76,26 +75,26 @@ if 'atk' in config:
 
 import torchvision
 
-train_transform = torchvision.transforms.Compose([
-    torchvision.transforms.RandomCrop(32, padding=4),
-    torchvision.transforms.RandomHorizontalFlip(),
-    # torchvision.transforms.ColorJitter(                 # Randomly change brightness, contrast, saturation
-    #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
-    # ),
-    # torchvision.transforms.RandomApply([                # Randomly apply Gaussian Blur
-    #     torchvision.transforms.GaussianBlur(kernel_size=3)
-    # ], p=0.2),
-    torchvision.transforms.ToTensor(),
-    # torchvision.transforms.Lambda(lambda x: x + 0.1 * torch.randn_like(x))
-    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-    # torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
-])
+# train_transform = torchvision.transforms.Compose([
+#     torchvision.transforms.RandomCrop(32, padding=4),
+#     torchvision.transforms.RandomHorizontalFlip(),
+#     # torchvision.transforms.ColorJitter(                 # Randomly change brightness, contrast, saturation
+#     #     brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1
+#     # ),
+#     # torchvision.transforms.RandomApply([                # Randomly apply Gaussian Blur
+#     #     torchvision.transforms.GaussianBlur(kernel_size=3)
+#     # ], p=0.2),
+#     torchvision.transforms.ToTensor(),
+#     # torchvision.transforms.Lambda(lambda x: x + 0.1 * torch.randn_like(x))
+#     # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+#     # torchvision.transforms.RandomErasing(p=0.5, scale=(0.02, 0.2), ratio=(0.3, 3.3))
+# ])
 
-test_transform = torchvision.transforms.Compose([
-    torchvision.transforms.ToTensor(),
-    # torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
-    # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
-])
+# test_transform = torchvision.transforms.Compose([
+#     torchvision.transforms.ToTensor(),
+#     # torchvision.transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
+#     # torchvision.transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010)),
+# ])
 
 
 train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = train_transform)
