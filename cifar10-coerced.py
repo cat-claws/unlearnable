@@ -28,8 +28,8 @@ parser.add_argument('--scheduler-eta_min', type=float)
 parser.add_argument('--scheduler-step_size', type=int)
 parser.add_argument('--scheduler-gamma', type=float)
 
-parser.add_argument('--dataset', type=str)
 parser.add_argument('--path', type=str)
+parser.add_argument('--dataset', type=str)
 
 parser.add_argument('--train_transform', type=str)
 parser.add_argument('--test_transform', type=str)
@@ -49,13 +49,11 @@ parser.add_argument('--atk-eps', type=float)
 parser.add_argument('--atk-alpha', type=float)
 parser.add_argument('--atk-steps', type=int)
 
-
 config = {k: v for k, v in vars(parser.parse_args()).items() if v is not None}
 print(config)
 
 writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flush_secs=10)
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
-
 
 model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
 
@@ -68,18 +66,16 @@ if 'atk' in config:
     config['atk'] = build_atk(config, model)
 
 from hardcoded_transforms import transforms
-
-import torchvision
-# train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transforms(config.pop('train_ransform', None)))
-
 datasets = [
     torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10', split='train', transform = transforms(config.get('train_transform', None))),
     torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = transforms(config.pop('train_transform', None))) if config['dataset'] != '' else None
 ]
+
 from mix import MultiDatasetMixer
 train_set = MultiDatasetMixer(datasets, [1 - config['private_ratio'], config['private_ratio']], seed=123)
 print('train length: ', len(train_set))
 
+import torchvision
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transforms(config.pop('test_transform', None)))
 
 train_loader =  torch.utils.data.DataLoader(train_set, batch_size=config['batch_size'], shuffle=True, num_workers=2, pin_memory=True)
