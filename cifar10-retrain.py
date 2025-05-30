@@ -168,7 +168,7 @@ for x_ in Attack(torch.optim.AdamW, [X], steps = 2000, foreach=False, maximize=T
     #     dataset_repo="trial",
     #     config_name="resnet18-retrain-3",
     #     private=False,
-    #     token = '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'
+    #     token = ''
     # )
 
 # tsne_plot(train_features.numpy(), np.array(train_set.targets))
