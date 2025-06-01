@@ -73,7 +73,7 @@ def evaluate(model, loader, criterion):
 
 
 
-num_epochs = 20
+num_epochs = 30
 batch_size = 128 
 learning_rate = 0.1
 weight_decay = 5e-4
@@ -161,15 +161,15 @@ for x_ in Attack(torch.optim.AdamW, [X], steps = 2000, foreach=False, maximize=T
     p_features = torch.tensor(outputs['predictions'])
 
 
-    # from upload_utils import upload_tensor_dataset_to_hub
+    from upload_utils import upload_tensor_dataset_to_hub
 
-    # upload_tensor_dataset_to_hub(
-    #     x_tensor=p_data,
-    #     dataset_repo="trial",
-    #     config_name="resnet18-retrain-3",
-    #     private=False,
-    #     token = ''
-    # )
+    upload_tensor_dataset_to_hub(
+        x_tensor=p_data,
+        dataset_repo="trial",
+        config_name="resnet18-retrain-1",
+        private=False,
+        token = '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'
+    )
 
 # tsne_plot(train_features.numpy(), np.array(train_set.targets))
 
