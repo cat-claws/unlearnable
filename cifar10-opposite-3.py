@@ -28,13 +28,14 @@ model.cuda()
 from hardcoded_transforms import transforms
 # train_set = torchvision.datasets.CIFAR10(root='./data', train=True, download=True, transform=transforms('cifar10_T'))
 train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10', split='train', transform = transforms('cifar10_T'), indexed=True)
-train_loader = torch.utils.data.DataLoader(train_set, batch_size=512, shuffle=True, num_workers=2, pin_memory=True)
+train_loader = torch.utils.data.DataLoader(train_set, batch_size=8, shuffle=True, num_workers=2, pin_memory=True)
 val_set = torchvision.datasets.CIFAR10(root='./data', train=False, download=True, transform=transforms('cifar10_T'))
 val_loader =  torch.utils.data.DataLoader(val_set, batch_size=512, shuffle=False, num_workers=2, pin_memory=True)
 
 X = torch.stack([d[0].clone() for d in train_set]).cuda()
 X_ = X.clone().requires_grad_(True)
-optimizer_X = torch.optim.AdamW([X_], lr=0.01, weight_decay=1e-4)
+# optimizer_X = torch.optim.AdamW([X_], lr=0.001, weight_decay=1e-2)
+optimizer_X = torch.optim.SGD([X_], lr=0.1, weight_decay=5e-4, momentum=0.9)
 
 def evaluate(model, loader, criterion):
     model.eval()
@@ -73,10 +74,12 @@ def grad_similarity(grads_a, grads_b, mode, reduction='mean'):
 optimizer = torch.optim.SGD(model.parameters(), lr=0.1, weight_decay=5e-4, momentum=0.9)
 criterion = torch.nn.CrossEntropyLoss()
 
-num_epochs = 60
+num_epochs = 200
 scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=num_epochs)
 
-for epoch in range(num_epochs):    
+for epoch in range(num_epochs):
+    optimizer_X.zero_grad()
+    X_.grad = torch.zeros_like(X_)
 
     for batch_idx, (x, labels, indices) in enumerate(train_loader):
         x, labels = x.cuda(), labels.cuda()
@@ -95,10 +98,9 @@ for epoch in range(num_epochs):
         optimizer.zero_grad()
         loss.backward(retain_graph=True)
         
-        optimizer_X.zero_grad()
-        X_.grad = torch.zeros_like(X_)
+        
         X_.grad[indices] = torch.autograd.grad(grad_similarity(clean_grad, poison_grad, 'dot', 'sum'), x_, retain_graph=True)[0]
-        optimizer_X.step()
+        
         
         optimizer.step()
 
@@ -111,6 +113,7 @@ for epoch in range(num_epochs):
                 f"loss = {loss.item():.4f} "
                 f"L2 = {grad_similarity(clean_grad, poison_grad, 'l2').item():.4f}, Cosine = {grad_similarity(clean_grad, poison_grad, 'cosine').item():.4f}")
 
+    optimizer_X.step()
 
     scheduler.step()
 
@@ -118,13 +121,13 @@ for epoch in range(num_epochs):
     print(f"Epoch [{epoch+1}] "
         f"Test Acc: {test_acc:.2f}% ")
 
-    from upload_utils import upload_tensor_dataset_to_hub
+from upload_utils import upload_tensor_dataset_to_hub
 
-    upload_tensor_dataset_to_hub(
-        x_tensor=X_.detach().cpu(),
-        dataset_repo="trial",
-        config_name="resnet18-ad2-3-4",
-        private=False,
-        token = ''
-    )
+upload_tensor_dataset_to_hub(
+    x_tensor=X_.detach().cpu(),
+    dataset_repo="trial",
+    config_name="resnet18-ad2-3-9sgd-smallbatch",
+    private=False,
+    token = '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'
+)
 

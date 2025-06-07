@@ -30,7 +30,7 @@
 
 # srun --partition=sunjunresearch --gres=gpu:2 python -u beat.py  
 
-srun --partition=researchlong --gres=gpu:1 --constraint=h100 python -u cifar10-opposite-3.py
+srun --partition=researchlong --gres=gpu:1 --constraint=a100 python -u cifar10-opposite-3.py
 
 
 # srun --partition=researchlong --gres=gpu:1 --constraint=l40 python -u cifar10-coerced.py --dataset 'cifar10-8-8-wen2023adversarial-pull' --path poison --model resnet_cifar --model-block "" --model-layers 2 2 2 2 --training_step classification_step --optimizer SGD --optimizer-lr 0.1 --optimizer-weight_decay 0.0005 --optimizer-momentum 0.9 --scheduler CosineAnnealingLR  --scheduler-T_max 30 --epochs 31 --private_ratio 0.1 --train_transform cifar10_T --test_transform cifar10_T
