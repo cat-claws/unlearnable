@@ -1,11 +1,7 @@
 import torch
-from utils import set_seed
-set_seed(1)
-
 from torch.utils.tensorboard import SummaryWriter
 
 from torchiteration import train, validate, predict, classification_step, predict_classification_step, build_optimizer, build_scheduler, save_hparams, attacked_classification_step
-
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -19,6 +15,8 @@ parser.add_argument('--model-widen_factor', type=int)
 parser.add_argument('--model-drop_rate', type=float)
 parser.add_argument('--model-layers', type=int, nargs='+')
 parser.add_argument('--model-block', type=str)
+parser.add_argument('--model-num_classes', type=int)
+
 
 parser.add_argument('--optimizer-lr', type=float)
 parser.add_argument('--optimizer-momentum', type=float)
@@ -44,7 +42,6 @@ parser.add_argument('--training_step', type=str)
 parser.add_argument('--validation_step', type=str, default='classification_step')
 parser.add_argument('--batch_size', type=int, default=128)
 parser.add_argument('--epochs', type=int)
-parser.add_argument('--epochs-ft', type=int)
 parser.add_argument('--device', type=str, default='cuda')
 parser.add_argument('--posion-eps', type=float)
 parser.add_argument('--note', type=str)
@@ -61,7 +58,8 @@ writer = SummaryWriter(comment = f"_{config['dataset']}_{config['model']}", flus
 save_hparams(writer, config, metric_dict={'Epoch-correct/valid': 0})
 
 model = torch.hub.load('cat-claws/nn', config['model'], pretrained= False, **{k[6:]: config.pop(k) for k in list(config) if k.startswith('model_')}).to(config['device'])
-
+print(model)
+raise
 config.update({k: eval(v) for k, v in config.items() if k.endswith('_step')})
 config['optimizer'] = build_optimizer(config, [p for p in model.parameters() if p.requires_grad])
 config['scheduler'] = build_scheduler(config, config['optimizer'])
@@ -71,14 +69,13 @@ if 'atk' in config:
     config['atk'] = build_atk(config, model)
 
 from hardcoded_transforms import transforms
-import random
+datasets = [
+    torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'zh-plus/tiny-imagenet', split='train', transform = transforms(config.get('train_transform', None))),
+    torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = transforms(config.pop('train_transform', None))) if config['dataset'] != '' else None
+]
 
-train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10', split='train', transform = transforms(config.get('train_transform', None)))
-
-a_idx = random.sample(range(len(train_set)), int((1 - config['private_ratio']) * len(train_set)))
-b_idx = list(set(range(len(train_set))) - set(a_idx))
-
-train_set = torch.utils.data.Subset(train_set, a_idx)
+from mix import MultiDatasetMixer
+train_set = MultiDatasetMixer(datasets, [1 - config['private_ratio'], config['private_ratio']], seed=123)
 print('train length: ', len(train_set))
 
 import torchvision
@@ -94,26 +91,9 @@ for epoch in range(config['epochs']):
 
     validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
 
-if config['dataset'] != '':
-    ft_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = transforms(config.pop('train_transform', None))) 
-    ft_set = torch.utils.data.Subset(ft_set, b_idx)
-    print('ft length: ', len(ft_set))
-
-    ft_loader =  torch.utils.data.DataLoader(ft_set, batch_size=config['batch_size'], shuffle=True, num_workers=2, pin_memory=True)
-
-    # config['scheduler'].last_epoch = 0
-    # config['optimizer'].param_groups[0]['lr'] = 1e-3
-    for epoch in range(epoch, epoch + config['epochs']):
-
-        print(config['optimizer'].param_groups[0]['lr'])
-        train(model, train_loader = ft_loader, epoch = epoch, writer = writer, **config)
-        # config['optimizer'].param_groups[0]['lr'] = 1e-4
-
-        validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
-
     # torch.save(model.state_dict(), 'checkpoints/' + writer.log_dir.split('/')[-1] + f"_{epoch:03}.pt")
 
-# print(model)
+print(model)
 
 outputs = predict(model, predict_classification_step, val_loader = val_loader, **config)
 

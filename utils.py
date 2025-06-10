@@ -77,3 +77,21 @@ def get_gpu_usage():
     for idx, line in enumerate(usage):
         gpu_util, mem_used, mem_total = map(int, line.split(', '))
         print(f"GPU {idx}: {gpu_util}% used, {mem_used}MB / {mem_total}MB memory")
+
+
+import random
+import numpy as np
+import torch
+
+def set_seed(seed: int = 42):
+    random.seed(seed)
+    np.random.seed(seed)
+
+    torch.manual_seed(seed)
+
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)  # for multi-GPU
+
+    # Ensure deterministic behavior
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
