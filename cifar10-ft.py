@@ -1,4 +1,6 @@
 import torch
+import random
+
 from utils import set_seed
 set_seed(1)
 
@@ -71,7 +73,6 @@ if 'atk' in config:
     config['atk'] = build_atk(config, model)
 
 from hardcoded_transforms import transforms
-import random
 
 train_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/poison', name = 'cifar10', split='train', transform = transforms(config.get('train_transform', None)))
 
@@ -94,6 +95,7 @@ for epoch in range(config['epochs']):
 
     validate(model, val_loader = val_loader, epoch = epoch, writer = writer, **config)
 
+print(f"switch at epoch: {epoch}")
 if config['dataset'] != '':
     ft_set = torch.hub.load('cat-claws/datasets', 'CIFAR10', path = 'cat-claws/'+config['path'], name = config['dataset'], split='train', transform = transforms(config.pop('train_transform', None))) 
     ft_set = torch.utils.data.Subset(ft_set, b_idx)
@@ -101,9 +103,10 @@ if config['dataset'] != '':
 
     ft_loader =  torch.utils.data.DataLoader(ft_set, batch_size=config['batch_size'], shuffle=True, num_workers=2, pin_memory=True)
 
-    # config['scheduler'].last_epoch = 0
+    # config['scheduler'].last_epoch = epoch - config['epochs_ft']
     # config['optimizer'].param_groups[0]['lr'] = 1e-3
-    for epoch in range(epoch, epoch + config['epochs']):
+    print(f"last epoch: {config['scheduler'].last_epoch}")
+    for epoch in range(config['epochs'], config['epochs'] + config['epochs_ft']):
 
         print(config['optimizer'].param_groups[0]['lr'])
         train(model, train_loader = ft_loader, epoch = epoch, writer = writer, **config)
